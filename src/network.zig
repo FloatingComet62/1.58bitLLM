@@ -1,5 +1,6 @@
 const std = @import("std");
 const layer = @import("layer.zig");
+const activation = @import("activation.zig");
 
 pub const Network = struct {
     const Self = @This();
@@ -8,7 +9,8 @@ pub const Network = struct {
     pub fn init(
         log: anytype,
         allocator: std.mem.Allocator,
-        layer_nodes: std.ArrayList(u32)
+        layer_nodes: std.ArrayList(u32),
+        activationFunction: activation.Function,
     ) anyerror!Self {
         std.debug.assert(layer_nodes.items.len > 1);
         var layers = try std.ArrayList(layer.Layer).initCapacity(allocator, layer_nodes.items.len - 1);
@@ -16,7 +18,13 @@ pub const Network = struct {
         while (i < layer_nodes.items.len) {
             const in_nodes = layer_nodes.items[i - 1];
             const out_nodes = layer_nodes.items[i];
-            layers.appendAssumeCapacity(try layer.Layer.init(log, allocator, in_nodes, out_nodes));
+            layers.appendAssumeCapacity(try layer.Layer.init(
+                log,
+                allocator,
+                in_nodes,
+                out_nodes,
+                activationFunction
+            ));
             i += 1;
         }
         return .{

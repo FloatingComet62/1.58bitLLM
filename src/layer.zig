@@ -1,5 +1,6 @@
 const std = @import("std");
 const weightset = @import("weightset.zig");
+const activation = @import("activation.zig");
 
 pub const Layer = struct {
     const Self = @This();
@@ -7,13 +8,15 @@ pub const Layer = struct {
     output: std.ArrayList(f64),
     number_of_rows: u32,
     number_of_columns: u32,
+    activationFunction: activation.Function,
 
     // TODO: resolve anytype
     pub fn init(
         log: anytype,
         allocator: std.mem.Allocator,
         in_nodes: u32,
-        out_nodes: u32
+        out_nodes: u32,
+        activationFunction: activation.Function,
     ) anyerror!Self {
         if ((in_nodes % 5 != 0) or (out_nodes % 5 != 0)) {
             try log.print("It is recommanded to use a multiple of 5 for the number of nodes\n", .{});
@@ -25,8 +28,10 @@ pub const Layer = struct {
         for (0..number_of_items) |_| {
             weights.appendAssumeCapacity(0);
         }
+        var biases = try std.ArrayList(f64).initCapacity(allocator, number_of_rows);
         var output = try std.ArrayList(f64).initCapacity(allocator, number_of_rows);
         for (0..number_of_rows) |_| {
+            biases.appendAssumeCapacity(0.0);
             output.appendAssumeCapacity(0.0);
         }
         return .{
@@ -34,6 +39,7 @@ pub const Layer = struct {
             .output = output,
             .number_of_rows = number_of_rows,
             .number_of_columns = number_of_columns,
+            .activationFunction = activationFunction,
         };
     }
 
@@ -48,30 +54,35 @@ pub const Layer = struct {
         self.weights[weightset_index] = weight_set;
     }
 
+    pub fn set_bias(self: *Self, bias_index: u32, bias: f64) void {
+        self.biases.items[bias_index] = bias;
+    }
+
     pub fn apply(
         self: Self,
         prev_layer_outputs: std.ArrayList(f64)
     ) void {
         std.debug.assert(prev_layer_outputs.items.len <= (self.number_of_columns * 5));
         for (0..self.number_of_rows) |i| {
-            self.output.items[i] = 0;
+            self.output.items[i] = self.biases.items[i];
             for (0..self.number_of_columns) |j| {
                 self.output.items[i] += applyWeights(
                     @Vector(5, f64){
-                        save_index(prev_layer_outputs, 5 * j + 0),
-                        save_index(prev_layer_outputs, 5 * j + 1),
-                        save_index(prev_layer_outputs, 5 * j + 2),
-                        save_index(prev_layer_outputs, 5 * j + 3),
-                        save_index(prev_layer_outputs, 5 * j + 4),
+                        safe_index(prev_layer_outputs, 5 * j + 0),
+                        safe_index(prev_layer_outputs, 5 * j + 1),
+                        safe_index(prev_layer_outputs, 5 * j + 2),
+                        safe_index(prev_layer_outputs, 5 * j + 3),
+                        safe_index(prev_layer_outputs, 5 * j + 4),
                     },
                     weightset.weightset_value_to_abcde(self.weights.items[i * self.number_of_columns + j])
                 );
             }
+            self.output.items[i] = self.activationFunction.solve(self.output.items[i]);
         }
     }
 };
 
-fn save_index(arr: std.ArrayList(f64), i: usize) f64 {
+fn safe_index(arr: std.ArrayList(f64), i: usize) f64 {
     if (i >= arr.items.len) {
         return 0.0;
     }

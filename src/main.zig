@@ -2,6 +2,7 @@ const std = @import("std");
 const lib = @import("_158bit_lib");
 const Layer = lib.layer.Layer;
 const Network = lib.network.Network;
+const activation = lib.activation;
 
 pub fn main() !void {
     const stdout_file = std.io.getStdOut().writer();
@@ -14,6 +15,7 @@ pub fn main() !void {
 
     const inputSlice = [_]f64{ 1, 2, 3, 4, 5 };
     const networkStructureSlice = [_]u32{ inputSlice.len, 10, 5 };
+    const activationFunction = activation.Sigmoid;
 
     var networkStructure = try std.ArrayList(u32).initCapacity(
         std.heap.page_allocator,
@@ -29,7 +31,12 @@ pub fn main() !void {
         input.appendAssumeCapacity(item);
     }
 
-    var network = try Network.init(stdout, allocator, networkStructure);
+    var network = try Network.init(
+        stdout,
+        allocator,
+        networkStructure,
+        activationFunction.function()
+    );
 
     const output = network.apply(input);
     for (output.items) |item| {
