@@ -1,14 +1,24 @@
 const std = @import("std");
 const weightset = @import("weightset.zig");
 const activation = @import("activation.zig");
+const cost = @import("cost.zig");
 
 pub const Layer = struct {
     const Self = @This();
+
     weights: std.ArrayList(u8),
+    biases: std.ArrayList(f64),
     output: std.ArrayList(f64),
+
     number_of_rows: u32,
     number_of_columns: u32,
+
     activationFunction: activation.Function,
+    costFunction: cost.CostFunction,
+
+    costGradientWeights: std.ArrayList(u8),
+    costGradientBiases: std.ArrayList(f64),
+    learnStep: f64,
 
     // TODO: resolve anytype
     pub fn init(
@@ -17,6 +27,7 @@ pub const Layer = struct {
         in_nodes: u32,
         out_nodes: u32,
         activationFunction: activation.Function,
+        costFunction: cost.CostFunction,
     ) anyerror!Self {
         if ((in_nodes % 5 != 0) or (out_nodes % 5 != 0)) {
             try log.print("It is recommanded to use a multiple of 5 for the number of nodes\n", .{});
@@ -25,21 +36,30 @@ pub const Layer = struct {
         const number_of_rows = out_nodes;
         const number_of_items = number_of_columns * number_of_rows;
         var weights = try std.ArrayList(u8).initCapacity(allocator, number_of_items);
+        var costGradientWeights = try std.ArrayList(u8).initCapacity(allocator, number_of_items);
         for (0..number_of_items) |_| {
             weights.appendAssumeCapacity(0);
+            costGradientWeights.appendAssumeCapacity(0);
         }
         var biases = try std.ArrayList(f64).initCapacity(allocator, number_of_rows);
+        var costGradientBiases = try std.ArrayList(f64).initCapacity(allocator, number_of_rows);
         var output = try std.ArrayList(f64).initCapacity(allocator, number_of_rows);
         for (0..number_of_rows) |_| {
             biases.appendAssumeCapacity(0.0);
+            costGradientBiases.appendAssumeCapacity(0.0);
             output.appendAssumeCapacity(0.0);
         }
         return .{
             .weights = weights,
+            .biases = biases,
             .output = output,
             .number_of_rows = number_of_rows,
             .number_of_columns = number_of_columns,
             .activationFunction = activationFunction,
+            .costFunction = costFunction,
+            .costGradientWeights = costGradientWeights,
+            .costGradientBiases = costGradientBiases,
+            .learnStep = 0.5,
         };
     }
 
@@ -80,6 +100,17 @@ pub const Layer = struct {
             self.output.items[i] = self.activationFunction.solve(self.output.items[i]);
         }
     }
+
+    pub fn applyGradients(self: *Self, learnRate: f64) void {
+        for (0..self.biases.items.len) |i| {
+            self.biases.items[i] += self.costGradientBiases[i] * learnRate;
+            self.costGradientBiases[i] = 0;
+        }
+    }
+
+    pub fn calculateOutputLayerNodeValues(self: *Self) void {
+
+    }
 };
 
 fn safe_index(arr: std.ArrayList(f64), i: usize) f64 {
@@ -89,14 +120,14 @@ fn safe_index(arr: std.ArrayList(f64), i: usize) f64 {
     return arr.items[i];
 }
 
-fn applyWeights(inputs: @Vector(5, f64), abcde: weightset.ABCDE) f64 {
+fn applyWeights(inputs: @Vector(5, f64), abcde: u16) f64 {
     // TODO: do the bit manipulation technique
     const weights = @Vector(5, f64){
-        @floatFromInt(((abcde.abcd & 0b11000000) >> 6) - 1),
-        @floatFromInt(((abcde.abcd & 0b00110000) >> 4) - 1),
-        @floatFromInt(((abcde.abcd & 0b00001100) >> 2) - 1),
-        @floatFromInt(((abcde.abcd & 0b00000011)) - 1),
-        @floatFromInt((abcde.e) - 1),
+        @floatFromInt(((abcde & 0b0011000000) >> 6) - 1),
+        @floatFromInt(((abcde & 0b0000110000) >> 4) - 1),
+        @floatFromInt(((abcde & 0b0000001100) >> 2) - 1),
+        @floatFromInt(((abcde & 0b0000000011)     ) - 1),
+        @floatFromInt(((abcde & 0b1100000000) >> 8) - 1),
     };
     const vec = inputs * weights;
     return vec[0] + vec[1] + vec[2] + vec[3] + vec[4];
