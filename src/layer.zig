@@ -2,6 +2,7 @@ const std = @import("std");
 const weightset = @import("weightset.zig");
 const activation = @import("activation.zig");
 const cost = @import("cost.zig");
+const LayerLearnData = @import("learn_data.zig").LayerLearnData;
 
 pub const Layer = struct {
     const Self = @This();
@@ -77,6 +78,15 @@ pub const Layer = struct {
     pub fn set_bias(self: *Self, bias_index: u32, bias: f64) void {
         self.biases.items[bias_index] = bias;
     }
+    pub fn get_weight(self: Self, weight_index: u32) u8 {
+        const quotient = @divTrunc(weight_index, 5);
+        const remainder = @as(u8, @intCast(@mod(weight_index, 5)));
+        const modifyableWeightSet = weightset.ModifyableWeightSet.init(self.weights.items[quotient]);
+        return (modifyableWeightSet.data << @intCast(remainder * 2)) & 0b11;
+    }
+    pub fn get_weight2d(self: Self, node_in: usize, node_out: usize) u8 {
+        return self.get_weight(node_in * self.number_of_columns + node_out);
+    }
 
     pub fn apply(
         self: Self,
@@ -102,14 +112,32 @@ pub const Layer = struct {
     }
 
     pub fn applyGradients(self: *Self, learnRate: f64) void {
+        //TODO: weights
         for (0..self.biases.items.len) |i| {
             self.biases.items[i] += self.costGradientBiases[i] * learnRate;
             self.costGradientBiases[i] = 0;
         }
     }
 
-    pub fn calculateOutputLayerNodeValues(self: *Self) void {
+    pub fn calculateOutputLayerNodeValues(self: *Self, layer_learn_data: *LayerLearnData, expected_output: std.ArrayList(f64)) void {
+        std.debug.assert(layer_learn_data.inputs.items.len == expected_output.items.len);
+        for (0..layer_learn_data.node_values.items.len) |i| {
+            const cost_derivative = self.costFunction.derivative(layer_learn_data.activations.items[i], expected_output.items[i]);
+            const activation_derivative = self.activationFunction.derivative(layer_learn_data.weighted_inputs, i);
+            layer_learn_data.node_values.items[i] = cost_derivative * activation_derivative;
+        }
+    }
 
+    pub fn calculateHiddenLayerNodeValues(self: *Self, layer_learn_data: *LayerLearnData, old_layer: *Layer, old_node_values: std.ArrayList(64)) void {
+        for (0..self.number_of_rows) |new_node_index| {
+            var new_node_value: f64 = 0.0;
+            for (0..old_node_values.items.len) |old_node_index| {
+                const weighted_input_derivative = old_layer.get_weight2d(new_node_index, old_node_index);
+                new_node_value += (weighted_input_derivative - 1) * old_node_values.items[old_node_index];
+            }
+            new_node_value *= self.activationFunction.derivative(layer_learn_data, new_node_index);
+            layer_learn_data.node_values[new_node_index] = new_node_value;
+        }
     }
 };
 

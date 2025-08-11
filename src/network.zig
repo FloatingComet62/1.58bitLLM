@@ -1,6 +1,7 @@
 const std = @import("std");
 const layer = @import("layer.zig");
 const activation = @import("activation.zig");
+const NetworkLearnData = @import("learn_data.zig").NetworkLearnData;
 
 pub const Network = struct {
     const Self = @This();
@@ -39,5 +40,9 @@ pub const Network = struct {
             layer_input = network_layer.output;
         }
         return layer_input;
+    }
+
+    pub fn applyGradients(self: *Self, input: std.ArrayList(f64), expected_output: std.ArrayList(f64), network_learn: NetworkLearnData) void {
+        //TODO
     }
 };
