@@ -31,7 +31,7 @@ fn expandedTou16(expanded: []const u8) u16 {
     const c = digit(expanded[4], expanded[5]);
     const d = digit(expanded[6], expanded[7]);
     const e = digit(expanded[8], expanded[9]);
-    return (e << 8) | (a << 6) | (b << 4) | (c << 2) | d;
+    return (@as(u16, @intCast(e)) << 8) | (a << 6) | (b << 4) | (c << 2) | d;
 }
 
 fn digit(a: u8, b: u8) u8 {
@@ -53,9 +53,9 @@ pub const ModifyableWeightSet = struct {
             const mid = @divFloor((left + right), 2);
             const val = baseData[mid];
             if (val.value == weightset_value) {
-                return val.abcde;
+                return . { .data = val.abcde };
             }
-            if (val.value > value) {
+            if (val.value > weightset_value) {
                 left = mid;
                 continue;
             }

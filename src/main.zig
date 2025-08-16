@@ -2,7 +2,12 @@ const std = @import("std");
 const lib = @import("_158bit_lib");
 const Layer = lib.layer.Layer;
 const Network = lib.network.Network;
+const DataSet = lib.dataset.Dataset;
 const activation = lib.activation;
+const cost = lib.cost;
+
+const INPUT_LEN = 5;
+const OUTPUT_LEN = 5;
 
 pub fn main() !void {
     const stdout_file = std.io.getStdOut().writer();
@@ -13,35 +18,36 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const inputSlice = [_]f64{ 1, 2, 3, 4, 5 };
-    const networkStructureSlice = [_]u32{ inputSlice.len, 10, 5 };
+    const networkStructure = [_]u32{ INPUT_LEN, 10, OUTPUT_LEN };
     const activationFunction = activation.Sigmoid;
+    const costFunction = cost.MeanSquaredError;
 
-    var networkStructure = try std.ArrayList(u32).initCapacity(
-        std.heap.page_allocator,
-        networkStructureSlice.len
-    );
-    defer networkStructure.deinit();
-    for (networkStructureSlice) |item| {
-        networkStructure.appendAssumeCapacity(item);
-    }
-    var input = try std.ArrayList(f64).initCapacity(std.heap.page_allocator, inputSlice.len);
-    defer input.deinit();
-    for (inputSlice) |item| {
-        input.appendAssumeCapacity(item);
-    }
+    var prng = std.Random.DefaultPrng.init(1);
+    const rand = prng.random();
 
     var network = try Network.init(
         stdout,
         allocator,
-        networkStructure,
-        activationFunction.function()
+        &networkStructure,
+        activationFunction.function(),
+        costFunction.function(),
     );
+    network.initialize_random_layer_weights(rand);
 
-    const output = network.apply(input);
-    for (output.items) |item| {
-        try stdout.print("{d} ", .{item});
-    }
+    const dataset = try DataSet.init(allocator, @embedFile("training_data.txt"));
+    // for (dataset.datapoints.items) |datapoint| {
+    //     try stdout.print("Datapoint: Input(", .{});
+    //     for (datapoint.input.items) |input_item| {
+    //         try stdout.print("{d}, ", .{input_item});
+    //     }
+    //     try stdout.print("), Output(", .{});
+    //     for (datapoint.output.items) |output_item| {
+    //         try stdout.print("{d}, ", .{output_item});
+    //     }
+    //     try stdout.print(")\n", .{});
+    // }
+    _ = dataset;
+
     try stdout.print("\n", .{});
 
     try bw.flush();

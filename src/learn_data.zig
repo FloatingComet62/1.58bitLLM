@@ -25,7 +25,7 @@ pub const NetworkLearnData = struct {
     fn init(allocator: std.mem.Allocator, layers: std.ArrayList(Layer)) anyerror!Self {
         var layer_data = try std.ArrayList(f64).initCapacity(allocator, layers.items.len);
         for (layers.items) |layer| {
-            layer_data.appendAssumeCapacity(layer);
+            layer_data.appendAssumeCapacity(try LayerLearnData.init(allocator, layer));
         }
         return .{
             .layer_data = layer_data

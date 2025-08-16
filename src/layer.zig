@@ -64,6 +64,12 @@ pub const Layer = struct {
         };
     }
 
+    pub fn initialize_random_weights(self: *Self, rand: std.Random) void {
+        for (0..self.weights.items.len) |i| {
+            self.weights.items[i] = rand.intRangeAtMost(u8, 0, 0b11110010);
+        }
+    }
+
     pub fn set_weight(self: *Self, weight_index: u32, weight: u8) void {
         const quotient = @divTrunc(weight_index, 5);
         const remainder = @as(u8, @intCast(@mod(weight_index, 5)));
@@ -90,12 +96,15 @@ pub const Layer = struct {
 
     pub fn apply(
         self: Self,
-        prev_layer_outputs: std.ArrayList(f64)
+        prev_layer_outputs: []const f64
     ) void {
-        std.debug.assert(prev_layer_outputs.items.len <= (self.number_of_columns * 5));
+        std.debug.assert(prev_layer_outputs.len <= (self.number_of_columns * 5));
         for (0..self.number_of_rows) |i| {
             self.output.items[i] = self.biases.items[i];
             for (0..self.number_of_columns) |j| {
+                const weightsetObject = weightset.ModifyableWeightSet.init((
+                    self.weights.items[i * self.number_of_columns + j]
+                ));
                 self.output.items[i] += applyWeights(
                     @Vector(5, f64){
                         safe_index(prev_layer_outputs, 5 * j + 0),
@@ -104,10 +113,10 @@ pub const Layer = struct {
                         safe_index(prev_layer_outputs, 5 * j + 3),
                         safe_index(prev_layer_outputs, 5 * j + 4),
                     },
-                    weightset.weightset_value_to_abcde(self.weights.items[i * self.number_of_columns + j])
+                    weightsetObject.data
                 );
             }
-            self.output.items[i] = self.activationFunction.solve(self.output.items[i]);
+            self.output.items[i] = self.activationFunction.solve(self.output.items, i);
         }
     }
 
@@ -141,11 +150,11 @@ pub const Layer = struct {
     }
 };
 
-fn safe_index(arr: std.ArrayList(f64), i: usize) f64 {
-    if (i >= arr.items.len) {
+fn safe_index(arr: []const f64, i: usize) f64 {
+    if (i >= arr.len) {
         return 0.0;
     }
-    return arr.items[i];
+    return arr[i];
 }
 
 fn applyWeights(inputs: @Vector(5, f64), abcde: u16) f64 {
